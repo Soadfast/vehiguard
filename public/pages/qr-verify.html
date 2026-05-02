@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIDDI — Verificación de Acceso</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0a0f1e; font-family: 'Inter', system-ui, sans-serif; padding: 20px;
+    }
+
+    .card {
+      width: 100%; max-width: 400px;
+      background: #111827; border: 1px solid #1e293b;
+      border-radius: 24px; overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      animation: fadeUp 0.4s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-top {
+      padding: 32px; text-align: center;
+      border-bottom: 1px solid #1e293b;
+    }
+    .brand { font-family: monospace; font-size: 14px; color: #475569; margin-bottom: 24px; letter-spacing: 0.1em; }
+
+    .status-icon {
+      width: 88px; height: 88px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px; margin: 0 auto 20px;
+      transition: all 0.3s;
+    }
+    .status-icon.ok { background: rgba(34,197,94,0.12); border: 2px solid rgba(34,197,94,0.3); }
+    .status-icon.deny { background: rgba(239,68,68,0.12); border: 2px solid rgba(239,68,68,0.3); }
+    .status-icon.loading { background: rgba(100,116,139,0.12); border: 2px solid rgba(100,116,139,0.2); }
+
+    .status-text {
+      font-size: 22px; font-weight: 800; letter-spacing: 0.04em;
+      transition: color 0.3s;
+    }
+    .status-text.ok { color: #4ade80; }
+    .status-text.deny { color: #f87171; }
+    .status-text.loading { color: #64748b; }
+
+    .card-body { padding: 24px 32px 32px; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #1e293b; }
+    .info-row:last-child { border-bottom: none; }
+    .info-key { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; }
+    .info-val { font-size: 14px; font-weight: 600; color: #f1f5f9; text-align: right; }
+
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #1e293b; border-top-color: #475569;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg { text-align: center; color: #94a3b8; font-size: 14px; padding: 8px 0; }
+
+    .footer {
+      padding: 16px; text-align: center; font-size: 11px; color: #334155;
+      border-top: 1px solid #0f172a;
+    }
+
+    /* Pulse animation for OK */
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.3); }
+      50% { box-shadow: 0 0 0 16px rgba(34,197,94,0); }
+    }
+    .status-icon.ok { animation: pulse 2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-top">
+      <div class="brand">● MIDDI — CONTROL DE ACCESO</div>
+
+      <div class="status-icon loading" id="statusIcon">
+        <div class="spinner" id="spinner"></div>
+      </div>
+
+      <div class="status-text loading" id="statusText">Verificando...</div>
+    </div>
+
+    <div class="card-body" id="cardBody">
+      <!-- Filled by JS -->
+    </div>
+
+    <div class="footer">Verificación segura MIDDI • <span id="timestamp"></span></div>
+  </div>
+
+  <script>
+    document.getElementById('timestamp').textContent = new Date().toLocaleString('es-CL');
+
+    const token = window.location.pathname.split('/').pop();
+    const icon = document.getElementById('statusIcon');
+    const statusText = document.getElementById('statusText');
+    const body = document.getElementById('cardBody');
+
+    async function verify() {
+      try {
+        const res = await fetch(`/api/qr/verify/${encodeURIComponent(token)}`);
+        const data = await res.json();
+
+        if (data.error) {
+          renderError('Token inválido o malformado.');
+          return;
+        }
+
+        const ok = data.valid && data.activo;
+
+        // Update icon
+        icon.innerHTML = ok ? '✓' : '✕';
+        icon.className = `status-icon ${ok ? 'ok' : 'deny'}`;
+        icon.style.fontSize = '36px';
+        icon.style.fontWeight = '800';
+        icon.style.color = ok ? '#4ade80' : '#f87171';
+        icon.style.fontFamily = 'monospace';
+
+        statusText.textContent = data.status;
+        statusText.className = `status-text ${ok ? 'ok' : 'deny'}`;
+
+        if (data.data) {
+          const d = data.data;
+          body.innerHTML = `
+            <div class="info-row"><span class="info-key">Nombre</span><span class="info-val">${esc(d.nombre)}</span></div>
+            <div class="info-row"><span class="info-key">Cargo</span><span class="info-val">${esc(d.cargo)}</span></div>
+            <div class="info-row"><span class="info-key">Empresa</span><span class="info-val">${esc(d.empresa)}</span></div>
+            <div class="info-row"><span class="info-key">Estado</span><span class="info-val" style="color:${d.activo ? '#4ade80' : '#f87171'}">${d.activo ? 'Activo' : 'Inactivo'}</span></div>
+          `;
+        } else {
+          body.innerHTML = `<p class="error-msg">${esc(data.reason || 'Acceso no autorizado.')}</p>`;
+        }
+
+      } catch (e) {
+        renderError('Error de conexión. Verifique su red.');
+      }
+    }
+
+    function renderError(msg) {
+      icon.innerHTML = '⚠';
+      icon.className = 'status-icon deny';
+      icon.style.fontSize = '36px';
+      statusText.textContent = 'ACCESO DENEGADO';
+      statusText.className = 'status-text deny';
+      body.innerHTML = `<p class="error-msg">${esc(msg)}</p>`;
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    if (!token || token.length < 10) {
+      renderError('Token no encontrado en la URL.');
+    } else {
+      verify();
+    }
+  </script>
+</body>
+</html>

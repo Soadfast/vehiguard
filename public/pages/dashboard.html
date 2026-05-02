@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIDDI — Dashboard</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .worker-name-cell {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .worker-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+      background: var(--bg-hover); color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .worker-name { font-weight: 500; }
+    .worker-rut { font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono); }
+
+    .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .filter-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .table-wrapper { margin-top: 0; }
+
+    .export-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .export-menu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      min-width: 160px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      display: none;
+      z-index: 50;
+    }
+    .export-menu.open { display: block; }
+    .export-menu-item {
+      padding: 10px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      transition: background 0.1s;
+      color: var(--text-primary);
+    }
+    .export-menu-item:hover { background: var(--bg-hover); }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="/dashboard" class="navbar-brand">
+      <span class="brand-dot"></span>
+      <span>MIDDI</span>
+    </a>
+    <div class="navbar-right">
+      <span class="company-pill" id="companyPill" style="color: #888; border-color: #333">—</span>
+      <span style="font-size: 13px; color: var(--text-secondary)" id="userLabel">—</span>
+      <a href="/seguridad" class="btn btn-ghost btn-sm" style="text-decoration:none">🔐 Seguridad</a>
+      <a href="/empresa" class="btn btn-ghost btn-sm" style="text-decoration:none">🏢 Empresa</a>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Salir →</button>
+    </div>
+  </nav>
+
+  <div class="page-container fade-in">
+    <!-- Page header -->
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Panel de Control</h1>
+        <p class="page-subtitle" id="dashSubtitle">Gestión de trabajadores y documentos</p>
+      </div>
+      <button class="btn btn-primary" onclick="Modal.open('modalNewWorker')">
+        + Nuevo Trabajador
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-label">Total Trabajadores</div>
+        <div class="stat-value blue" id="statTotal">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Docs Vigentes</div>
+        <div class="stat-value green" id="statVigente">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Docs Vencidos</div>
+        <div class="stat-value red" id="statVencidos">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Documentos</div>
+        <div class="stat-value" id="statDocs">—</div>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="form-input" id="searchInput"
+          placeholder="Buscar por nombre, RUT, cargo...">
+      </div>
+      <select class="form-select" style="width: auto" id="filterEstado">
+        <option value="">Todos los estados</option>
+        <option value="vigente">✅ Vigentes</option>
+        <option value="vencido">❌ Con vencidos</option>
+      </select>
+    </div>
+
+    <!-- Workers table -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Trabajadores</span>
+        <span class="text-secondary" style="font-size: 13px" id="workerCount">0 trabajadores</span>
+      </div>
+      <div id="tableContainer">
+        <div class="loading-overlay">
+          <div class="spinner"></div>
+          <span>Cargando trabajadores...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: New Worker -->
+  <div class="modal-overlay" id="modalNewWorker">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Nuevo Trabajador</span>
+        <button class="modal-close" onclick="Modal.close('modalNewWorker')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo *</label>
+          <input type="text" class="form-input" id="newNombre" placeholder="Juan Pérez González">
+        </div>
+        <div class="form-group">
+          <label class="form-label">RUT *</label>
+          <input type="text" class="form-input" id="newRut" placeholder="12.345.678-9">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cargo *</label>
+          <input type="text" class="form-input" id="newCargo" placeholder="Conductor, Guardia, etc.">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="Modal.close('modalNewWorker')">Cancelar</button>
+        <button class="btn btn-primary" onclick="createWorker()">Crear Trabajador</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Worker -->
+  <div class="modal-overlay" id="modalEditWorker">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">Editar Trabajador</span>
+        <button class="modal-close" onclick="Modal.close('modalEditWorker')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editWorkerId">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo</label>
+          <input type="text" class="form-input" id="editNombre">
+        </div>
+        <div class="form-group">
+          <label class="form-label">RUT</label>
+          <input type="text" class="form-input" id="editRut">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cargo</label>
+          <input type="text" class="form-input" id="editCargo">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="Modal.close('modalEditWorker')">Cancelar</button>
+        <button class="btn btn-primary" onclick="updateWorker()">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/utils.js"></script>
+  <script>
+    let allWorkers = [];
+    let session = null;
+
+    const COMPANY_COLORS = {
+      x1: '#00C853', x2: '#00BCD4', x3: '#FF6F00'
+    };
+
+    async function init() {
+      session = await checkSession();
+      if (!session) return;
+
+      // Apply company theme
+      const color = COMPANY_COLORS[session.empresa] || '#2563EB';
+      document.getElementById('companyPill').textContent = session.companyName;
+      document.getElementById('companyPill').style.color = color;
+      document.getElementById('companyPill').style.borderColor = color + '55';
+      document.getElementById('companyPill').style.background = color + '15';
+      document.getElementById('userLabel').textContent = session.username;
+      document.getElementById('dashSubtitle').textContent = `${session.companyName} — Gestión de trabajadores`;
+
+      await loadWorkers();
+    }
+
+    async function loadWorkers() {
+      const data = await api.get('/api/workers');
+      if (!data) return;
+
+      allWorkers = data.data || [];
+      updateStats();
+      renderTable(allWorkers);
+    }
+
+    function updateStats() {
+      let totalDocs = 0, totalVencidos = 0;
+      allWorkers.forEach(w => {
+        totalDocs += w.totalDocumentos || 0;
+        totalVencidos += w.documentosVencidos || 0;
+      });
+      document.getElementById('statTotal').textContent = allWorkers.length;
+      document.getElementById('statVigente').textContent = totalDocs - totalVencidos;
+      document.getElementById('statVencidos').textContent = totalVencidos;
+      document.getElementById('statDocs').textContent = totalDocs;
+    }
+
+    function renderTable(workers) {
+      const container = document.getElementById('tableContainer');
+      document.getElementById('workerCount').textContent = `${workers.length} trabajador${workers.length !== 1 ? 'es' : ''}`;
+
+      if (workers.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">👷</div>
+            <div class="empty-state-title">Sin trabajadores</div>
+            <div class="empty-state-text">Agregue el primer trabajador para comenzar</div>
+          </div>`;
+        return;
+      }
+
+      const rows = workers.map(w => {
+        const initials = w.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        const estadoBadge = w.estadoGeneral === 'vencido'
+          ? `<span class="badge badge-vencido badge-dot">Vencido (${w.documentosVencidos})</span>`
+          : `<span class="badge badge-vigente badge-dot">Al día</span>`;
+
+        return `<tr>
+          <td>
+            <div class="worker-name-cell">
+              <div class="worker-avatar">${initials}</div>
+              <div>
+                <div class="worker-name">${w.nombre}</div>
+                <div class="worker-rut">${w.rut}</div>
+              </div>
+            </div>
+          </td>
+          <td>${w.cargo}</td>
+          <td style="text-align:center">
+            <span class="font-mono" style="font-size:13px">${w.totalDocumentos}</span>
+          </td>
+          <td>${estadoBadge}</td>
+          <td>
+            <div class="actions-cell">
+              <a href="/worker/${w._id}" class="btn btn-ghost btn-sm">Ver →</a>
+              <button class="btn btn-ghost btn-sm" onclick='openEditModal(${JSON.stringify(w)})'>Editar</button>
+              <div class="export-dropdown">
+                <button class="btn btn-ghost btn-sm" onclick="toggleExportMenu(this)">⬇ Exportar</button>
+                <div class="export-menu">
+                  <div class="export-menu-item" onclick="exportWorkerExcel('${w._id}'); closeAllMenus()">
+                    📊 Excel (.xlsx)
+                  </div>
+                  <div class="export-menu-item" onclick="exportWorkerPDF('${w._id}'); closeAllMenus()">
+                    📄 PDF
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="deleteWorker('${w._id}', '${w.nombre}')">Eliminar</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="table-wrapper" style="border:none; border-radius:0">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Trabajador</th>
+                <th>Cargo</th>
+                <th style="text-align:center">Documentos</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    function filterWorkers() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const estado = document.getElementById('filterEstado').value;
+
+      let filtered = allWorkers.filter(w => {
+        const matchSearch = !search ||
+          w.nombre.toLowerCase().includes(search) ||
+          w.rut.toLowerCase().includes(search) ||
+          w.cargo.toLowerCase().includes(search);
+        const matchEstado = !estado || w.estadoGeneral === estado;
+        return matchSearch && matchEstado;
+      });
+      renderTable(filtered);
+    }
+
+    document.getElementById('searchInput').addEventListener('input', filterWorkers);
+    document.getElementById('filterEstado').addEventListener('change', filterWorkers);
+
+    async function createWorker() {
+      const nombre = document.getElementById('newNombre').value.trim();
+      const rut = document.getElementById('newRut').value.trim();
+      const cargo = document.getElementById('newCargo').value.trim();
+
+      if (!nombre || !rut || !cargo) {
+        Toast.error('Complete todos los campos obligatorios');
+        return;
+      }
+
+      const data = await api.post('/api/workers', { nombre, rut, cargo });
+      if (data.success) {
+        Modal.close('modalNewWorker');
+        document.getElementById('newNombre').value = '';
+        document.getElementById('newRut').value = '';
+        document.getElementById('newCargo').value = '';
+        Toast.success('Trabajador creado correctamente');
+        await loadWorkers();
+      } else {
+        Toast.error(data.error || 'Error al crear trabajador');
+      }
+    }
+
+    function openEditModal(worker) {
+      document.getElementById('editWorkerId').value = worker._id;
+      document.getElementById('editNombre').value = worker.nombre;
+      document.getElementById('editRut').value = worker.rut;
+      document.getElementById('editCargo').value = worker.cargo;
+      Modal.open('modalEditWorker');
+    }
+
+    async function updateWorker() {
+      const id = document.getElementById('editWorkerId').value;
+      const nombre = document.getElementById('editNombre').value.trim();
+      const rut = document.getElementById('editRut').value.trim();
+      const cargo = document.getElementById('editCargo').value.trim();
+
+      const data = await api.put(`/api/workers/${id}`, { nombre, rut, cargo });
+      if (data.success) {
+        Modal.close('modalEditWorker');
+        Toast.success('Trabajador actualizado');
+        await loadWorkers();
+      } else {
+        Toast.error(data.error || 'Error al actualizar');
+      }
+    }
+
+    async function deleteWorker(id, nombre) {
+      if (!confirm(`¿Eliminar a ${nombre}? Se eliminarán todos sus documentos.`)) return;
+      const data = await api.delete(`/api/workers/${id}`);
+      if (data.success) {
+        Toast.success('Trabajador eliminado');
+        await loadWorkers();
+      } else {
+        Toast.error(data.error || 'Error al eliminar');
+      }
+    }
+
+    // Export dropdown
+    function toggleExportMenu(btn) {
+      const menu = btn.nextElementSibling;
+      const isOpen = menu.classList.contains('open');
+      closeAllMenus();
+      if (!isOpen) menu.classList.add('open');
+    }
+
+    function closeAllMenus() {
+      document.querySelectorAll('.export-menu.open').forEach(m => m.classList.remove('open'));
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.export-dropdown')) closeAllMenus();
+    });
+
+    init();
+  </script>
+</body>
+</html>

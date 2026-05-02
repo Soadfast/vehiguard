@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIDDI — Seguridad</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    body { background: #0a0f1e; color: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; margin: 0; }
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px; border-bottom: 1px solid #1e293b;
+      background: #111827; position: sticky; top: 0; z-index: 10;
+    }
+    .top-bar .brand { font-family: monospace; font-size: 18px; font-weight: 800; color: #f1f5f9; }
+    .nav-links { display: flex; gap: 16px; }
+    .nav-links a {
+      color: #64748b; text-decoration: none; font-size: 13px; font-weight: 500;
+      padding: 6px 12px; border-radius: 8px; transition: all 0.15s;
+    }
+    .nav-links a:hover { color: #f1f5f9; background: #1e293b; }
+    .nav-links a.active { color: #f1f5f9; background: #1e293b; }
+    .btn-logout {
+      font-size: 13px; color: #ef4444; background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2); border-radius: 8px;
+      padding: 6px 14px; cursor: pointer; font-family: inherit; transition: all 0.15s;
+    }
+    .btn-logout:hover { background: rgba(239,68,68,0.15); }
+
+    .page { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+    .page-header { margin-bottom: 32px; }
+    .page-title { font-size: 26px; font-weight: 800; color: #f1f5f9; margin-bottom: 6px; }
+    .page-sub { font-size: 14px; color: #64748b; }
+
+    /* Stats */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 20px; }
+    .stat-label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .stat-value { font-size: 22px; font-weight: 800; color: #f1f5f9; }
+    .stat-meta { font-size: 12px; color: #475569; margin-top: 4px; }
+
+    /* Section */
+    .section { background: #111827; border: 1px solid #1e293b; border-radius: 16px; margin-bottom: 24px; overflow: hidden; }
+    .section-header { padding: 18px 24px; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between; }
+    .section-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+
+    /* Log table */
+    .log-table { width: 100%; border-collapse: collapse; }
+    .log-table th {
+      text-align: left; padding: 12px 20px; font-size: 11px; font-weight: 600;
+      color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #1e293b;
+    }
+    .log-table td { padding: 13px 20px; font-size: 13px; color: #94a3b8; border-bottom: 1px solid #0f172a; }
+    .log-table tr:last-child td { border-bottom: none; }
+    .log-table tr:hover td { background: #0f172a; }
+
+    .badge-ok { display: inline-flex; align-items: center; gap: 5px; color: #4ade80; font-size: 12px; font-weight: 600; }
+    .badge-fail { display: inline-flex; align-items: center; gap: 5px; color: #f87171; font-size: 12px; font-weight: 600; }
+    .badge-logout { display: inline-flex; align-items: center; gap: 5px; color: #fbbf24; font-size: 12px; font-weight: 600; }
+
+    .empty-state { padding: 40px; text-align: center; color: #475569; font-size: 14px; }
+
+    /* Danger zone */
+    .danger-zone { padding: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: gap; }
+    .danger-info h4 { font-size: 14px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+    .danger-info p { font-size: 13px; color: #64748b; }
+    .btn-danger {
+      padding: 10px 20px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      color: #ef4444; border-radius: 10px; cursor: pointer; font-family: inherit; font-weight: 600; font-size: 13px;
+      transition: all 0.15s; white-space: nowrap; margin-left: 16px;
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+    .loading { text-align: center; padding: 32px; color: #475569; }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="brand">MIDDI</div>
+  <div class="nav-links">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/seguridad" class="active">Seguridad</a>
+    <a href="/empresa">Empresa</a>
+  </div>
+  <button class="btn-logout" id="btnLogout">Cerrar Sesión</button>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">🔐 Seguridad</h1>
+    <p class="page-sub">Historial de accesos y gestión de sesiones</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Empresa</div>
+      <div class="stat-value" id="companyName">—</div>
+      <div class="stat-meta">Sesión activa</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Usuario actual</div>
+      <div class="stat-value" id="currentUser">—</div>
+      <div class="stat-meta" id="sessionSince">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Último acceso previo</div>
+      <div class="stat-value" id="lastLoginDate">—</div>
+      <div class="stat-meta" id="lastLoginIp">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Intentos fallidos</div>
+      <div class="stat-value" id="failedCount">—</div>
+      <div class="stat-meta">Últimas 24h</div>
+    </div>
+  </div>
+
+  <!-- Login history -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">📋 Historial de Accesos</span>
+      <span style="font-size:12px; color:#475569;">Últimos 100 registros</span>
+    </div>
+    <div id="historyContainer">
+      <div class="loading">Cargando historial...</div>
+    </div>
+  </div>
+
+  <!-- Session management -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">🚪 Gestión de Sesión</span>
+    </div>
+    <div class="danger-zone">
+      <div class="danger-info">
+        <h4>Cerrar sesión actual</h4>
+        <p>Finaliza tu sesión activa. Deberás iniciar sesión nuevamente para acceder.</p>
+      </div>
+      <button class="btn-danger" id="btnCloseSession">Cerrar Sesión</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function init() {
+    // Session info
+    const sess = await fetch('/api/auth/session', { credentials: 'same-origin' }).then(r => r.json());
+    if (!sess.loggedIn) { window.location.href = '/login'; return; }
+    document.getElementById('companyName').textContent = sess.companyName || '—';
+    document.getElementById('currentUser').textContent = sess.username || '—';
+
+    // Last login
+    try {
+      const ll = await fetch('/api/security/last-login', { credentials: 'same-origin' }).then(r => r.json());
+      if (ll.success && ll.data) {
+        document.getElementById('lastLoginDate').textContent = fmtDate(ll.data.createdAt);
+        document.getElementById('lastLoginIp').textContent = 'IP: ' + (ll.data.ip || '—');
+      } else {
+        document.getElementById('lastLoginDate').textContent = 'Primer acceso';
+      }
+    } catch {}
+
+    // History
+    try {
+      const hist = await fetch('/api/security/history', { credentials: 'same-origin' }).then(r => r.json());
+      if (hist.success) {
+        renderHistory(hist.data);
+        const failed24h = hist.data.filter(l => {
+          const diff = Date.now() - new Date(l.createdAt).getTime();
+          return !l.success && diff < 86400000;
+        }).length;
+        document.getElementById('failedCount').textContent = failed24h;
+      }
+    } catch {}
+  }
+
+  function renderHistory(logs) {
+    const container = document.getElementById('historyContainer');
+    if (!logs.length) {
+      container.innerHTML = '<div class="empty-state">Sin registros disponibles</div>';
+      return;
+    }
+
+    const rows = logs.map(l => {
+      let badge;
+      if (l.reason === 'logout') {
+        badge = `<span class="badge-logout">◦ Logout</span>`;
+      } else if (l.success) {
+        badge = `<span class="badge-ok">● Exitoso</span>`;
+      } else {
+        badge = `<span class="badge-fail">● Fallido</span>`;
+      }
+      const ua = l.userAgent ? l.userAgent.slice(0, 60) + (l.userAgent.length > 60 ? '…' : '') : '—';
+      return `<tr>
+        <td>${fmtDate(l.createdAt)}</td>
+        <td>${l.ip || '—'}</td>
+        <td style="color:#64748b; font-size:12px;">${ua}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+
+    container.innerHTML = `<table class="log-table">
+      <thead><tr><th>Fecha/Hora</th><th>IP</th><th>Dispositivo</th><th>Estado</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  document.getElementById('btnLogout').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+    window.location.href = '/login';
+  });
+
+  document.getElementById('btnCloseSession').addEventListener('click', async () => {
+    if (!confirm('¿Cerrar sesión actual?')) return;
+    await fetch('/api/security/close-session', { method: 'POST', credentials: 'same-origin' });
+    window.location.href = '/login';
+  });
+
+  init();
+</script>
+</body>
+</html>
