@@ -11,9 +11,16 @@ const PORT = process.env.PORT || 3000;
 
 connectDB();
 
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const mongoose = require('mongoose');
 
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log('Mongo conectado');
+  })
+  .catch(err => {
+    console.error('Error Mongo:', err.message);
+  });
+  
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
